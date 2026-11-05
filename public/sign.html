@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Document - Pagewise</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <style>
+    .sign-topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .sign-topbar-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    }
+    .sign-title { font-size: 1.25rem; font-weight: 600; }
+    .sign-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .sign-notice { font-size: 0.75rem; color: var(--muted); margin-right: 0.5rem; }
+    .pdf-viewer-container {
+      display: flex; flex-direction: column; align-items: center; gap: 1.5rem; padding: 2rem 1rem;
+    }
+    .pdf-page-wrapper {
+      position: relative; background: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      border: 1px solid var(--border); border-radius: 2px;
+    }
+    .pdf-page-canvas { display: block; max-width: 100%; height: auto; }
+    .page-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+    }
+    .placed-item {
+      position: absolute; pointer-events: auto; cursor: move;
+      border: 1px dashed var(--primary); background: rgba(37,99,235,0.04);
+      user-select: none; touch-action: none;
+    }
+    .placed-item:hover, .placed-item.selected {
+      border: 1px solid var(--primary); background: rgba(37,99,235,0.08);
+    }
+    .item-delete-btn {
+      position: absolute; top: -10px; right: -10px; width: 22px; height: 22px;
+      border-radius: 50%; background: var(--danger); color: #fff; border: none;
+      font-size: 14px; line-height: 1; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; padding: 0; z-index: 10;
+    }
+    .resize-handle {
+      position: absolute; bottom: -5px; right: -5px; width: 12px; height: 12px;
+      background: var(--primary); border: 1px solid #fff; cursor: nwse-resize;
+      border-radius: 2px; z-index: 10;
+    }
+    .item-content-text {
+      width: 100%; height: 100%; border: none; outline: none; background: transparent;
+      font-family: var(--font-sans); font-size: 14px; color: #000; padding: 4px;
+      resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word;
+    }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border);
+      width: 90%; max-width: 520px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+    }
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--border); gap: 0.5rem; }
+    .modal-tab {
+      padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer;
+      font-weight: 500; font-size: 0.9rem; color: var(--muted); border-bottom: 2px solid transparent;
+    }
+    .modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .sig-canvas-wrap {
+      border: 1px solid var(--border); border-radius: var(--radius); background: #fafafa;
+      margin: 0.5rem 0; touch-action: none; position: relative;
+    }
+    #drawCanvas { display: block; width: 100%; height: 160px; touch-action: none; cursor: crosshair; }
+    .type-preview {
+      min-height: 90px; border: 1px solid var(--border); border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Caveat', cursive; font-size: 2.2rem; color: #0f172a;
+      background: #fafafa; margin-top: 0.75rem; padding: 0.5rem;
+    }
+    .img-preview-wrap {
+      max-height: 140px; border: 1px dashed var(--border); border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center; margin-top: 0.5rem;
+      background: #fafafa; overflow: hidden; padding: 0.5rem;
+    }
+    .img-preview-wrap img { max-width: 100%; max-height: 120px; object-fit: contain; }
+  </style>
+</head>
+<body>
+  <div class="sign-topbar">
+    <div class="sign-topbar-row">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <a id="backLink" href="#" class="button secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">&larr; Dashboard</a>
+        <div id="docTitle" class="sign-title">Document</div>
+        <span id="savedBadge" class="badge" style="display: none; background: #dcfce7; color: #15803d;">Signed copy saved</span>
+      </div>
+      <div class="sign-actions">
+        <span class="sign-notice">This is a visual signature, not a certified digital signature.</span>
+        <a id="dlSavedBtn" href="#" target="_blank" download class="button secondary" style="display: none; font-size: 0.85rem;">Download saved copy</a>
+        <button id="downloadBtn" style="font-size: 0.85rem;">Download Signed PDF</button>
+      </div>
+    </div>
+    <div class="sign-topbar-row">
+      <div style="display: flex; gap: 0.5rem;">
+        <button id="addSigBtn" class="secondary" style="font-size: 0.8rem;">+ Add signature</button>
+        <button id="addDateBtn" class="secondary" style="font-size: 0.8rem;">+ Add date</button>
+        <button id="addTextBtn" class="secondary" style="font-size: 0.8rem;">+ Add text</button>
+      </div>
+      <div id="signStatus" style="font-size: 0.8rem; color: var(--muted);"></div>
+    </div>
+  </div>
+
+  <div id="pdfViewer" class="pdf-viewer-container">
+    <div id="loadingText" style="padding: 3rem; color: var(--muted);">Loading PDF document...</div>
+  </div>
+
+  <!-- Signature Maker Modal -->
+  <div id="sigModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 1.1rem;">Create Signature</h3>
+        <button id="closeModalBtn" style="background: transparent; border: none; font-size: 1.25rem; color: var(--muted); cursor: pointer;">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="draw">Draw</button>
+        <button class="modal-tab" data-tab="type">Type</button>
+        <button class="modal-tab" data-tab="upload">Upload image</button>
+      </div>
+      <div id="tab-draw" class="tab-pane active">
+        <div class="sig-canvas-wrap">
+          <canvas id="drawCanvas" width="450" height="160"></canvas>
+        </div>
+        <div style="display: flex; justify-content: flex-end;">
+          <button id="clearDrawBtn" class="secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Clear</button>
+        </div>
+      </div>
+      <div id="tab-type" class="tab-pane">
+        <input type="text" id="typeInput" placeholder="Type your name" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem;">
+        <div id="typePreview" class="type-preview">Preview</div>
+      </div>
+      <div id="tab-upload" class="tab-pane">
+        <input type="file" id="sigFileInput" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width: 100%; font-size: 0.85rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.85rem; color: var(--text);">
+          <input type="checkbox" id="removeBgCheck" checked> Remove white background
+        </label>
+        <div class="img-preview-wrap">
+          <img id="uploadPreviewImg" style="display: none;" alt="Signature preview">
+          <span id="uploadHint" style="font-size: 0.8rem; color: var(--muted);">Upload a PNG or JPG signature image</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+        <button id="useSavedBtn" class="secondary" style="font-size: 0.8rem; display: none;">Use saved signature</button>
+        <div style="display: flex; gap: 0.5rem; margin-left: auto;">
+          <button id="cancelSigBtn" class="secondary">Cancel</button>
+          <button id="useSigBtn" disabled>Use signature</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/sign.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Pagewise</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <header class="app-header no-print">
+    <div class="logo">Pagewise</div>
+    <div class="editor-actions">
+      <span class="share-note">Read-only view</span>
+      <button type="button" id="downloadPdfBtn" class="button secondary" title="Choose Save as PDF" style="font-size: 0.8rem; padding: 0.35rem 0.6rem;">Download PDF</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="printHint" class="print-hint no-print" style="display: none; margin-bottom: 1rem;"></div>
+
+    <div id="errorState" style="display: none; text-align: center; margin-top: 5rem;">
+      <h2>This page is not available</h2>
+      <p style="margin: 1rem 0 2rem; color: var(--muted);">This document does not exist or was deleted.</p>
+    </div>
+
+    <div id="loadingState" style="text-align: center; margin-top: 5rem; color: var(--muted);">
+      Loading document...
+    </div>
+
+    <div id="docWrapper" class="page-container" style="display: none;">
+      <div id="viewContent" class="page-sheet"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    const parts = window.location.pathname.split('/');
+    const docId = parts[2] ? parts[2].trim() : '';
+
+    const errorState = document.getElementById('errorState');
+    const loadingState = document.getElementById('loadingState');
+    const docWrapper = document.getElementById('docWrapper');
+    const viewContent = document.getElementById('viewContent');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const printHint = document.getElementById('printHint');
+
+    async function loadDoc() {
+      if (!docId) {
+        showError();
+        return;
+      }
+      try {
+        const res = await fetch(`/api/p/${docId}`);
+        if (!res.ok) {
+          showError();
+          return;
+        }
+        const doc = await res.json();
+        document.title = (doc.title || 'Untitled') + ' - Pagewise';
+        viewContent.innerHTML = doc.html || '<p></p>';
+        loadingState.style.display = 'none';
+        docWrapper.style.display = 'flex';
+      } catch (err) {
+        showError();
+      }
+    }
+
+    function showError() {
+      loadingState.style.display = 'none';
+      docWrapper.style.display = 'none';
+      errorState.style.display = 'block';
+      if (downloadPdfBtn) downloadPdfBtn.style.display = 'none';
+    }
+
+    if (downloadPdfBtn) {
+      downloadPdfBtn.addEventListener('click', () => {
+        const isPhone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 640;
+        const hint = isPhone
+          ? 'Use Share, then Print, then Save as PDF.'
+          : 'Choose Save as PDF. In print options, turn off Headers and footers.';
+        if (printHint) {
+          printHint.textContent = hint;
+          printHint.style.display = 'block';
+        }
+        setTimeout(() => {
+          window.print();
+        }, 100);
+      });
+    }
+
+    loadDoc();
+  </script>
+</body>
+</html>
+

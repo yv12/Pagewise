@@ -1,0 +1,466 @@
+/* Pagewise Shared Styles */
+:root {
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #1a202c;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --radius: 8px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  background-color: var(--primary);
+  color: #fff;
+  transition: background-color 0.15s ease;
+}
+button:hover, .button:hover {
+  background-color: var(--primary-hover);
+  text-decoration: none;
+}
+button.secondary, .button.secondary {
+  background-color: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+button.secondary:hover, .button.secondary:hover {
+  background-color: #f1f5f9;
+}
+button.danger, .button.danger {
+  background-color: var(--danger);
+  color: #fff;
+}
+button.danger:hover, .button.danger:hover {
+  background-color: var(--danger-hover);
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Landing Page */
+.hero {
+  text-align: center;
+  padding: 4rem 1rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-top: 3rem;
+}
+.hero h1 {
+  font-size: 2.25rem;
+  margin-bottom: 1rem;
+}
+.hero p {
+  color: var(--muted);
+  max-width: 500px;
+  margin: 0 auto 2rem;
+  font-size: 1.1rem;
+}
+
+/* Header & Nav */
+header.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+/* Dashboard Cards & Layout */
+.notice-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+}
+.connector-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+.connector-url-row {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+.connector-url-row input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: 0.875rem;
+  background: #f8fafc;
+}
+.setup-steps {
+  font-size: 0.875rem;
+  color: var(--muted);
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+.dash-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.doc-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+.doc-card:hover {
+  border-color: #cbd5e1;
+}
+.doc-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  word-break: break-word;
+}
+.doc-card-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+.doc-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Editor layout & Page */
+.editor-topbar {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.editor-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.editor-title-input {
+  font-size: 1.25rem;
+  font-weight: 600;
+  border: none;
+  outline: none;
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+.editor-title-input:focus {
+  background: #f1f5f9;
+}
+.editor-status {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-align: right;
+}
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.share-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.print-hint {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+.editor-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.editor-toolbar button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.editor-toolbar button:hover {
+  background: #f1f5f9;
+  border-color: var(--border);
+}
+.editor-toolbar .separator {
+  width: 1px;
+  background: var(--border);
+  margin: 0 0.25rem;
+}
+
+/* Conflict banner */
+.conflict-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+}
+
+/* Informational & warning banners */
+.notice-banner {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  color: #854d0e;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+/* Upload dropzone */
+.upload-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.upload-dropzone:hover, .upload-dropzone.drag-active {
+  border-color: var(--primary);
+  background: #f8fafc;
+}
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dropzone-icon {
+  font-size: 2rem;
+}
+.dropzone-text {
+  font-size: 0.95rem;
+}
+.dropzone-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.upload-progress {
+  margin-top: 0.75rem;
+  font-weight: 500;
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #e2e8f0;
+  color: var(--muted);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+
+/* Page canvas (A4 feel) */
+.page-container {
+  padding: 2rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+.page-sheet {
+  background: #fff;
+  width: 100%;
+  max-width: 800px;
+  min-height: 1050px;
+  padding: 3rem 4rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+.page-sheet h1, .page-sheet h2, .page-sheet h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.page-sheet p {
+  margin-bottom: 1rem;
+}
+.page-sheet ul, .page-sheet ol {
+  margin-bottom: 1rem;
+  padding-left: 2rem;
+}
+.page-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.page-sheet th, .page-sheet td {
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .page-sheet {
+    padding: 1.5rem;
+  }
+}
+
+/* Print stylesheet */
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  .no-print,
+  .editor-topbar,
+  .editor-toolbar,
+  .editor-nav-row,
+  .app-header,
+  .connector-box,
+  .notice-box,
+  .dash-actions,
+  .conflict-banner,
+  .print-hint,
+  .share-note,
+  button,
+  .button {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  .container,
+  .page-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .page-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    background: transparent !important;
+  }
+
+  .page-sheet table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    word-wrap: break-word !important;
+  }
+
+  .page-sheet th,
+  .page-sheet td {
+    word-break: break-word;
+  }
+
+  .page-sheet h1,
+  .page-sheet h2,
+  .page-sheet h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  a {
+    color: #000000 !important;
+    text-decoration: underline;
+  }
+}
+
+

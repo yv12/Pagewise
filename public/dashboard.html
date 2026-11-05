@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Pagewise</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">Pagewise</div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button id="uploadPdfBtn" class="secondary">Upload PDF</button>
+      <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" style="display: none;">
+      <button id="newDocBtn" class="secondary">+ New Document</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="notice-box">
+      <strong>Keep this link private:</strong> Anyone with your workspace link can view and edit your documents. Bookmark it to return later. Demo app. Do not upload sensitive documents.
+    </div>
+
+    <div class="connector-box">
+      <h3 style="margin-bottom: 0.25rem;">Connect to Claude</h3>
+      <p style="color: var(--muted); font-size: 0.875rem;">Add this MCP URL as a custom connector in Claude to create and edit documents directly from your chats.</p>
+      <div class="connector-url-row">
+        <input type="text" id="mcpUrl" readonly>
+        <button id="copyMcpBtn" class="secondary">Copy link</button>
+      </div>
+      <ol class="setup-steps">
+        <li>In Claude, go to <strong>Settings &rarr; Connectors</strong>.</li>
+        <li>Click <strong>Add custom connector</strong>.</li>
+        <li>Paste this connector URL and click <strong>Save</strong>.</li>
+      </ol>
+    </div>
+
+    <div id="dropZone" class="upload-dropzone">
+      <div class="dropzone-content">
+        <div class="dropzone-icon">📄</div>
+        <div class="dropzone-text"><strong>Upload PDF</strong> or drag and drop here</div>
+        <div class="dropzone-hint">Extract text to edit &bull; Max 10 MB</div>
+      </div>
+      <div id="uploadProgress" class="upload-progress" style="display: none;">
+        <span id="uploadProgressText">Reading PDF...</span>
+      </div>
+    </div>
+
+    <div class="dash-actions">
+      <h2>Documents</h2>
+      <span id="refreshStatus" style="font-size: 0.8rem; color: var(--muted);">Auto-refreshes</span>
+    </div>
+
+    <div id="docGrid" class="doc-grid"></div>
+    <div id="emptyState" style="display: none; text-align: center; padding: 3rem 1rem; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);">
+      <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No documents yet</p>
+      <p style="font-size: 0.875rem;">Upload a PDF, ask Claude, or click <strong>+ New Document</strong>.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { formatTimeAgo, copyToClipboard } from '/js/common.js';
+    import { extractTextFromPdf } from '/js/pdftext.js';
+
+    const parts = window.location.pathname.split('/');
+    const key = parts[2] ? parts[2].trim() : '';
+    if (!key) window.location.href = '/';
+    localStorage.setItem('pagewise_ws_key', key);
+
+    const mcpInput = document.getElementById('mcpUrl');
+    const copyBtn = document.getElementById('copyMcpBtn');
+    const fullMcpUrl = `${window.location.origin}/mcp/${key}`;
+    mcpInput.value = fullMcpUrl;
+
+    copyBtn.addEventListener('click', async () => {
+      if (await copyToClipboard(fullMcpUrl)) {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 2000);
+      }
+    });
+
+    const docGrid = document.getElementById('docGrid');
+    const emptyState = document.getElementById('emptyState');
+    const newDocBtn = document.getElementById('newDocBtn');
+    const uploadBtn = document.getElementById('uploadPdfBtn');
+    const fileInput = document.getElementById('pdfFileInput');
+    const dropZone = document.getElementById('dropZone');
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressText = document.getElementById('uploadProgressText');
+
+    newDocBtn.addEventListener('click', async () => {
+      newDocBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/w/${key}/docs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Untitled', html: '<p></p>' })
+        });
+        if (!res.ok) throw new Error('Failed to create document');
+        const doc = await res.json();
+        window.location.href = `/w/${key}/d/${doc.id}`;
+      } catch (err) {
+        alert(err.message);
+        newDocBtn.disabled = false;
+      }
+    });
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) {
+        handleFile(fileInput.files[0]);
+        fileInput.value = '';
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(n => dropZone.addEventListener(n, e => {
+      e.preventDefault(); dropZone.classList.add('drag-active');
+    }));
+    ['dragleave', 'drop'].forEach(n => dropZone.addEventListener(n, e => {
+      e.preventDefault(); dropZone.classList.remove('drag-active');
+    }));
+    dropZone.addEventListener('drop', e => {
+      if (e.dataTransfer?.files?.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    async function handleFile(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.pdf')) return alert('Please upload a PDF file.');
+      if (file.size === 0) return alert('The file is empty.');
+      if (file.size > 10 * 1024 * 1024) return alert('File is too large. Maximum is 10 MB.');
+
+      try {
+        const hBuf = await file.slice(0, 4).arrayBuffer();
+        if (new TextDecoder().decode(hBuf) !== '%PDF') return alert('Please upload a PDF file.');
+      } catch {
+        return alert('We could not read this file.');
+      }
+
+      if (!window.pdfjsLib) return alert('Could not load the PDF tools. Refresh the page.');
+
+      progressDiv.style.display = 'block';
+      progressText.textContent = 'Reading PDF...';
+      uploadBtn.disabled = true;
+
+      try {
+        const ab = await file.arrayBuffer();
+        const res = await extractTextFromPdf(ab, (cur, max) => {
+          progressText.textContent = `Reading page ${cur} of ${max}...`;
+        });
+
+        if (res.isScanned) {
+          alert('This looks like a scanned PDF. Text editing is not possible. You can still sign it.');
+        }
+
+        progressText.textContent = 'Saving document...';
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('title', res.title || file.name.replace(/\.pdf$/i, ''));
+        fd.append('html', res.isScanned ? '<p></p>' : res.html);
+
+        const upRes = await fetch(`/api/w/${key}/upload`, { method: 'POST', body: fd });
+        if (!upRes.ok) {
+          const d = await upRes.json().catch(() => ({}));
+          throw new Error(d.error || 'Upload failed. Try again.');
+        }
+        const doc = await upRes.json();
+        window.location.href = `/w/${key}/d/${doc.id}`;
+      } catch (err) {
+        alert(err.message || 'We could not read this file.');
+        progressDiv.style.display = 'none';
+        uploadBtn.disabled = false;
+      }
+    }
+
+    async function loadDocs() {
+      try {
+        const res = await fetch(`/api/w/${key}/docs`);
+        if (res.status === 404) {
+          document.body.innerHTML = `
+            <div class="container" style="text-align: center; margin-top: 5rem;">
+              <h2>This link is not valid</h2>
+              <p style="margin: 1rem 0 2rem; color: var(--muted);">This workspace does not exist or has expired.</p>
+              <a href="/" class="button">Create a new workspace</a>
+            </div>`;
+          return;
+        }
+        if (res.ok) renderDocs(await res.json());
+      } catch (err) {
+        console.error('Failed to load documents:', err);
+      }
+    }
+
+    function renderDocs(docs) {
+      if (!docs || docs.length === 0) {
+        docGrid.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+      docGrid.innerHTML = docs.map(d => {
+        const isPdf = d.kind === 'pdf';
+        const badge = isPdf ? '<span class="badge">PDF</span>' : '';
+        const signedBadge = d.has_signed_copy ? '<span class="badge" style="background:#dcfce7;color:#15803d;">Signed copy saved</span>' : '';
+        const editorText = d.last_editor === 'claude' ? 'edited by Claude' : 'edited by you';
+        const timeAgo = formatTimeAgo(d.updated_at);
+        const signBtn = isPdf ? `<a href="/w/${key}/s/${d.id}" class="button secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Sign</a>` : '';
+        const dlSigned = (isPdf && d.has_signed_copy && d.signed_file_id) ? `<a href="/api/w/${key}/files/${d.signed_file_id}" target="_blank" download class="button secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Download signed</a>` : '';
+        return `
+          <div class="doc-card" data-id="${d.id}">
+            <div>
+              <div class="doc-card-title">${escapeHtml(d.title || 'Untitled')} ${badge} ${signedBadge}</div>
+              <div class="doc-card-meta">${editorText} &bull; ${timeAgo}</div>
+            </div>
+            <div class="doc-card-actions">
+              <a href="/w/${key}/d/${d.id}" class="button secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">${isPdf ? 'Edit' : 'Open'}</a>
+              ${signBtn}
+              ${dlSigned}
+              <button class="secondary danger delete-btn" data-id="${d.id}" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Delete</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      docGrid.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          if (!confirm('Are you sure you want to delete this document?')) return;
+          const res = await fetch(`/api/w/${key}/docs/${btn.getAttribute('data-id')}`, { method: 'DELETE' });
+          if (res.ok) loadDocs();
+          else alert('Could not delete document.');
+        });
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    loadDocs();
+    setInterval(loadDocs, 10000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagewise - Documents connected to Claude</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Pagewise</h1>
+      <p>Documents that live between Claude and your browser. Let Claude write, then edit, format, and sign right here.</p>
+      <button id="createBtn" style="font-size: 1.1rem; padding: 0.75rem 1.5rem;">Create my workspace</button>
+      <p id="errorMsg" style="color: var(--danger); margin-top: 1rem; display: none;"></p>
+    </div>
+  </div>
+
+  <script type="module">
+    const createBtn = document.getElementById('createBtn');
+    const errorMsg = document.getElementById('errorMsg');
+
+    // If already has key saved, check if user wants to open it
+    const savedKey = localStorage.getItem('pagewise_ws_key');
+    if (savedKey) {
+      const p = document.createElement('p');
+      p.style.marginTop = '1.5rem';
+      p.innerHTML = `<a href="/w/${savedKey}">Return to your existing workspace &rarr;</a>`;
+      document.querySelector('.hero').appendChild(p);
+    }
+
+    createBtn.addEventListener('click', async () => {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      errorMsg.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/workspaces', { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to create workspace');
+        }
+        const { key } = await res.json();
+        localStorage.setItem('pagewise_ws_key', key);
+        window.location.href = `/w/${key}`;
+      } catch (err) {
+        errorMsg.textContent = err.message;
+        errorMsg.style.display = 'block';
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create my workspace';
+      }
+    });
+  </script>
+</body>
+</html>
+
