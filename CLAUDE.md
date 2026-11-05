@@ -22,4 +22,4 @@ Pagewise is a small web app that runs on Claude through MCP. Claude writes docum
 Stop and ask the user in plain words. Do not guess.
 
 ## Current phase
-Phase 1: done
+Phase 6: built (local tasks complete, awaiting remote GitHub push and Railway deploy)
