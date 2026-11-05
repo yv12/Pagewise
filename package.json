@@ -7,11 +7,11 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x || 22.x"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^12.11.1",
     "express": "^4.21.0",
     "sanitize-html": "^2.14.0",
     "zod": "^3.24.0"
