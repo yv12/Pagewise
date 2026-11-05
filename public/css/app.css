@@ -361,26 +361,78 @@ header.app-header {
   border-radius: 2px;
   outline: none;
 }
-.page-sheet h1, .page-sheet h2, .page-sheet h3 {
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
+.page-sheet h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+}
+.page-sheet h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0.9rem;
+  margin-bottom: 0.15rem;
+  line-height: 1.25;
+}
+.page-sheet h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.2rem;
+  line-height: 1.25;
+}
+.page-sheet hr {
+  border: none;
+  border-top: 1px solid #1a202c;
+  margin: 0.2rem 0 0.5rem 0;
 }
 .page-sheet p {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.45;
 }
 .page-sheet ul, .page-sheet ol {
-  margin-bottom: 1rem;
-  padding-left: 2rem;
+  margin-bottom: 0.6rem;
+  padding-left: 1.5rem;
+}
+.page-sheet li {
+  margin-bottom: 0.2rem;
+  line-height: 1.4;
 }
 .page-sheet table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
-.page-sheet th, .page-sheet td {
+.page-sheet table:has(th) th,
+.page-sheet table:has(th) td {
   border: 1px solid var(--border);
-  padding: 0.5rem;
+  padding: 0.4rem 0.5rem;
   text-align: left;
+}
+.page-sheet table.layout-table,
+.page-sheet table.no-border,
+.page-sheet table[border="0"],
+.page-sheet table:not(:has(th)) {
+  border: none !important;
+  margin-bottom: 0.25rem;
+}
+.page-sheet table.layout-table td,
+.page-sheet table.no-border td,
+.page-sheet table[border="0"] td,
+.page-sheet table:not(:has(th)) td {
+  border: none !important;
+  padding: 0.1rem 0 !important;
+}
+.page-sheet .split-row,
+.page-sheet .split-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  margin-bottom: 0.25rem;
 }
 
 @media (max-width: 640px) {
@@ -455,6 +507,26 @@ header.app-header {
   .page-sheet h3 {
     break-after: avoid;
     page-break-after: avoid;
+  }
+
+  .page-sheet hr {
+    border: none !important;
+    border-top: 1px solid #000000 !important;
+    margin: 0.15rem 0 0.35rem 0 !important;
+  }
+
+  .page-sheet table.layout-table td,
+  .page-sheet table.no-border td,
+  .page-sheet table[border="0"] td,
+  .page-sheet table:not(:has(th)) td {
+    border: none !important;
+    padding: 0.1rem 0 !important;
+  }
+
+  .page-sheet .split-row,
+  .page-sheet .split-line {
+    display: flex !important;
+    justify-content: space-between !important;
   }
 
   a {

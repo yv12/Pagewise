@@ -3,16 +3,40 @@ import sanitizeHtml from 'sanitize-html';
 const options = {
   allowedTags: [
     'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'u',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'blockquote', 'hr'
+    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'blockquote', 'hr',
+    'div', 'span'
   ],
   allowedAttributes: {
-    a: ['href'],
-    '*': ['style']
+    a: ['href', 'target', 'rel'],
+    table: ['class', 'border', 'cellpadding', 'cellspacing', 'style'],
+    tr: ['class', 'style'],
+    td: ['class', 'style', 'colspan', 'rowspan'],
+    th: ['class', 'style', 'colspan', 'rowspan'],
+    div: ['class', 'style'],
+    span: ['class', 'style'],
+    p: ['class', 'style'],
+    h1: ['class', 'style'],
+    h2: ['class', 'style'],
+    h3: ['class', 'style'],
+    hr: ['class', 'style'],
+    '*': ['style', 'class']
   },
   allowedSchemes: ['http', 'https', 'mailto'],
   allowedStyles: {
     '*': {
-      'text-align': [/^(left|right|center|justify)$/]
+      'text-align': [/^(left|right|center|justify)$/],
+      'font-weight': [/^(bold|normal|[1-9]00)$/],
+      'font-style': [/^(italic|normal)$/],
+      'display': [/^(flex|inline|inline-block|block|table|table-row|table-cell)$/],
+      'justify-content': [/^(space-between|space-around|flex-start|flex-end|center)$/],
+      'align-items': [/^(center|flex-start|flex-end|baseline|stretch)$/],
+      'width': [/^[0-9.]+(%|px|em|rem)?$/],
+      'margin': [/^[0-9.\s]+(px|em|rem|%)*$/],
+      'margin-top': [/^[0-9.\s]+(px|em|rem|%)*$/],
+      'margin-bottom': [/^[0-9.\s]+(px|em|rem|%)*$/],
+      'padding': [/^[0-9.\s]+(px|em|rem|%)*$/],
+      'border': [/^(none|0)$/],
+      'border-bottom': [/^.+$/]
     }
   }
 };

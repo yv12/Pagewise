@@ -4,7 +4,10 @@ import * as db from './db.js';
 import { clean } from './clean.js';
 
 const HTML_NOTE =
-  'Write content as simple HTML: h1, h2, h3, p, ul, ol, li, strong, em, table, tr, th, td, a, br. No scripts, no styles, no images.';
+  'Write content as clean semantic HTML preserving document structure: h1, h2, h3, p, ul, ol, li, strong, em, u, hr, table, tr, th, td, a, br, div, span. No scripts or images. ' +
+  'Preserve template styling: use <hr> directly under section titles (e.g. <h2>SUMMARY</h2><hr>); ' +
+  'for two-column split lines (such as company/role on left and date/location on right), use a borderless table: `<table class="layout-table" style="width: 100%;"><tr><td><strong>Company</strong>, Role</td><td style="text-align: right;">Date</td></tr></table>` or `<div class="split-row"><span>...</span><span>...</span></div>`; ' +
+  'for centered headers and contact information, use `<p style="text-align: center;">`.';
 const MAX_HTML_BYTES = 500 * 1024;
 
 function err(text) {

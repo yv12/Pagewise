@@ -1,7 +1,28 @@
-// PDF text extraction and conversion to clean HTML
+// PDF text extraction and conversion to clean HTML preserving document structure
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c]);
+}
+
+function autoLink(html) {
+  return html.replace(/(https?:\/\/[^\s<]+|(?:linkedin\.com\/in\/|github\.com\/)[^\s<]*|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, m => {
+    const url = m.includes('@') && !m.startsWith('mailto:') ? 'mailto:' + m : (!m.startsWith('http') ? 'https://' + m : m);
+    return `<a href="${url}">${m}</a>`;
+  });
+}
+
+function formatItems(items) {
+  let res = '', lastEnd = null;
+  for (const it of items) {
+    if (lastEnd !== null && it.x > lastEnd + 2 && !res.endsWith(' ') && !it.str.startsWith(' ')) res += ' ';
+    let s = escapeHtml(it.str);
+    if (it.isBold && it.isItalic) s = `<strong><em>${s}</em></strong>`;
+    else if (it.isBold) s = `<strong>${s}</strong>`;
+    else if (it.isItalic) s = `<em>${s}</em>`;
+    res += s;
+    lastEnd = it.x + it.width;
+  }
+  return autoLink(res);
 }
 
 export async function extractTextFromPdf(arrayBuffer, onProgress) {
@@ -41,6 +62,7 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
     const page = await pdf.getPage(p);
     const viewport = page.getViewport({ scale: 1.0 });
     const textContent = await page.getTextContent();
+    const styles = textContent.styles || {};
 
     const items = [];
     for (const item of textContent.items) {
@@ -48,7 +70,11 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
       const x = item.transform[4];
       const y = viewport.height - item.transform[5];
       const fontSize = Math.round(item.height || Math.abs(item.transform[0]) || Math.abs(item.transform[3]) || 12);
-      items.push({ str: item.str, x, y, width: item.width || 0, fontSize });
+      const fontStyle = styles[item.fontName];
+      const fontName = ((item.fontName || '') + ' ' + (fontStyle?.fontFamily || '')).toLowerCase();
+      const isBold = /bold|black|heavy|semibold|medium/i.test(fontName);
+      const isItalic = /italic|oblique/i.test(fontName);
+      items.push({ str: item.str, x, y, width: item.width || 0, fontSize, isBold, isItalic });
     }
 
     items.sort((a, b) => a.y - b.y || a.x - b.x);
@@ -63,19 +89,39 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
     const pageLines = [];
     for (const line of lines) {
       line.items.sort((a, b) => a.x - b.x);
-      let lineText = '';
-      let lastXEnd = null;
-      let maxFontSize = 0;
-      for (const it of line.items) {
+      let lineText = '', lastXEnd = null, maxFontSize = 0, splitIndex = -1;
+
+      for (let idx = 0; idx < line.items.length; idx++) {
+        const it = line.items[idx];
         maxFontSize = Math.max(maxFontSize, it.fontSize);
-        if (lastXEnd !== null && it.x > lastXEnd + 2 && !lineText.endsWith(' ') && !it.str.startsWith(' ')) {
-          lineText += ' ';
+        if (lastXEnd !== null) {
+          const gap = it.x - lastXEnd;
+          if (gap > 35 && it.x > viewport.width * 0.45 && splitIndex === -1) splitIndex = idx;
+          if (gap > 2 && !lineText.endsWith(' ') && !it.str.startsWith(' ')) lineText += ' ';
         }
         lineText += it.str;
         lastXEnd = it.x + it.width;
       }
+
       const trimmed = lineText.trim();
-      if (trimmed) pageLines.push({ text: trimmed, fontSize: maxFontSize, y: line.y, page: p, height: line.height });
+      if (!trimmed) continue;
+
+      const minX = line.items[0].x;
+      const maxX = line.items[line.items.length - 1].x + line.items[line.items.length - 1].width;
+      const isCentered = (maxX - minX) < viewport.width * 0.85 && Math.abs((minX + maxX) / 2 - viewport.width / 2) < (viewport.width * 0.08);
+
+      pageLines.push({
+        text: trimmed,
+        html: formatItems(line.items),
+        fontSize: maxFontSize,
+        y: line.y,
+        page: p,
+        height: line.height,
+        isCentered,
+        isSplit: splitIndex > 0,
+        leftHtml: splitIndex > 0 ? formatItems(line.items.slice(0, splitIndex)) : '',
+        rightHtml: splitIndex > 0 ? formatItems(line.items.slice(splitIndex)) : ''
+      });
     }
     rawPages.push(pageLines);
   }
@@ -88,10 +134,7 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
       const seen = new Set();
       for (const l of topBottom) {
         const norm = l.text.toLowerCase().replace(/\d+/g, '#').trim();
-        if (!seen.has(norm)) {
-          seen.add(norm);
-          candidateCounts.set(norm, (candidateCounts.get(norm) || 0) + 1);
-        }
+        if (!seen.has(norm)) { seen.add(norm); candidateCounts.set(norm, (candidateCounts.get(norm) || 0) + 1); }
       }
     }
     const threshold = Math.ceil(pagesToExtract * 0.5);
@@ -108,21 +151,15 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
 
   const allLines = rawPages.flat();
   const fullText = allLines.map(l => l.text).join(' ');
-  const isScanned = fullText.replace(/\s+/g, '').length < 50;
-
-  if (isScanned) return { html: '', title: '', isScanned: true, pageCount: totalPages };
+  if (fullText.replace(/\s+/g, '').length < 50) return { html: '', title: '', isScanned: true, pageCount: totalPages };
 
   const fontFreq = new Map();
   for (const l of allLines) {
     if (l.text.length > 3) fontFreq.set(l.fontSize, (fontFreq.get(l.fontSize) || 0) + 1);
   }
-  let bodyFontSize = 12;
-  let maxCount = 0;
+  let bodyFontSize = 12, maxCount = 0;
   for (const [size, count] of fontFreq) {
-    if (count > maxCount) {
-      maxCount = count;
-      bodyFontSize = size;
-    }
+    if (count > maxCount) { maxCount = count; bodyFontSize = size; }
   }
 
   const largerSizes = [...new Set(allLines.map(l => l.fontSize))]
@@ -140,21 +177,13 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
   }
 
   const parts = [];
-  let currentList = null;
-  let currentPara = [];
-  let extractedTitle = '';
+  let currentList = null, currentPara = [], extractedTitle = '';
 
   const flushPara = () => {
-    if (currentPara.length > 0) {
-      parts.push(`<p>${currentPara.join(' ')}</p>`);
-      currentPara = [];
-    }
+    if (currentPara.length > 0) { parts.push(`<p>${currentPara.join(' ')}</p>`); currentPara = []; }
   };
   const flushList = () => {
-    if (currentList) {
-      parts.push(`</${currentList}>`);
-      currentList = null;
-    }
+    if (currentList) { parts.push(`</${currentList}>`); currentList = null; }
   };
 
   for (let i = 0; i < allLines.length; i++) {
@@ -165,28 +194,43 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
     if (bulletMatch || numMatch) {
       flushPara();
       const listType = bulletMatch ? 'ul' : 'ol';
-      const itemText = (bulletMatch ? bulletMatch[2] : numMatch[2]).trim();
-      if (currentList !== listType) {
-        flushList();
-        parts.push(`<${listType}>`);
-        currentList = listType;
-      }
-      parts.push(`<li>${escapeHtml(itemText)}</li>`);
+      const itemHtml = l.html.replace(/^([•\u2022\u25cf\u25e6\u2219\*\-\–\—▪▫]|\([a-zA-Z0-9]\)|\d+[\.\)])\s*/, '').trim();
+      if (currentList !== listType) { flushList(); parts.push(`<${listType}>`); currentList = listType; }
+      parts.push(`<li>${itemHtml}</li>`);
+      continue;
+    }
+
+    if (l.isSplit) {
+      flushPara();
+      flushList();
+      parts.push(`<table class="layout-table" style="width: 100%;"><tr><td>${l.leftHtml}</td><td style="text-align: right;">${l.rightHtml}</td></tr></table>`);
       continue;
     }
 
     if (l.fontSize >= h1Threshold && l.text.length < 150 && !l.text.endsWith('.')) {
       flushPara();
       flushList();
-      parts.push(`<h1>${escapeHtml(l.text)}</h1>`);
+      parts.push(`<h1${l.isCentered ? ' style="text-align: center;"' : ''}>${l.html}</h1>`);
       if (!extractedTitle) extractedTitle = l.text;
       continue;
     }
 
-    if (l.fontSize >= h2Threshold && l.text.length < 150 && !l.text.endsWith('.')) {
+    const isUppercase = /^[A-Z0-9\s&/,:|\-]{3,40}$/.test(l.text.trim()) && /[A-Z]/.test(l.text) && !/[a-z]/.test(l.text);
+    const isSectionHeading = (l.fontSize >= h2Threshold || isUppercase) && l.text.length < 60 && !l.text.endsWith('.');
+
+    if (isSectionHeading) {
       flushPara();
       flushList();
-      parts.push(`<h2>${escapeHtml(l.text)}</h2>`);
+      parts.push(`<h2${l.isCentered ? ' style="text-align: center;"' : ''}>${l.html}</h2>\n<hr>`);
+      if (!extractedTitle) extractedTitle = l.text;
+      continue;
+    }
+
+    if (l.isCentered) {
+      flushPara();
+      flushList();
+      parts.push(`<p style="text-align: center;">${l.html}</p>`);
+      if (!extractedTitle) extractedTitle = l.text;
       continue;
     }
 
@@ -201,9 +245,9 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
     if (shouldBreak) flushPara();
 
     if (prev && prev.hyphenJoined && currentPara.length > 0) {
-      currentPara[currentPara.length - 1] += escapeHtml(l.text);
+      currentPara[currentPara.length - 1] += l.html;
     } else {
-      currentPara.push(escapeHtml(l.text));
+      currentPara.push(l.html);
     }
   }
 
