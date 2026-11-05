@@ -33,7 +33,7 @@ function checkRateLimit(ip) {
 // --- REST API ---
 app.use('/api', apiRouter);
 
-app.get('/healthz', (_req, res) => {
+app.get(['/healthz', '/health'], (_req, res) => {
   res.json({ status: 'ok' });
 });
 
@@ -94,9 +94,15 @@ app.get('/p/:id', (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   if (process.env.NODE_ENV === 'production' && !process.env.DATA_DIR) {
     console.warn('Warning: DATA_DIR is not set in production. Data may be lost on redeploy.');
   }
   console.log(`Pagewise running on port ${PORT}`);
+});
+
+process.on('SIGTERM', () => {
+  server.close(() => {
+    process.exit(0);
+  });
 });
