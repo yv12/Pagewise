@@ -355,51 +355,64 @@ header.app-header {
   width: 100%;
   max-width: 800px;
   min-height: 1050px;
-  padding: 3rem 4rem;
+  padding: 44pt 52pt;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
   border: 1px solid var(--border);
   border-radius: 2px;
   outline: none;
+  font-family: 'Carlito', Calibri, 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.18;
+  color: #000;
 }
 .page-sheet h1 {
-  font-size: 1.5rem;
+  font-size: 15pt;
   font-weight: 700;
-  margin-top: 0.5rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.2;
+  margin-top: 0;
+  margin-bottom: 1.5pt;
+  line-height: 1.15;
 }
 .page-sheet h2 {
-  font-size: 1.05rem;
+  font-size: 11pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 0.9rem;
-  margin-bottom: 0.15rem;
-  line-height: 1.25;
+  border-bottom: 1px solid #000;
+  padding-bottom: 1pt;
+  margin-top: 5pt;
+  margin-bottom: 2.5pt;
+  line-height: 1.15;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 .page-sheet h3 {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin-top: 0.75rem;
-  margin-bottom: 0.2rem;
-  line-height: 1.25;
+  font-size: 10.5pt;
+  font-weight: 700;
+  margin-top: 4pt;
+  margin-bottom: 2pt;
+  line-height: 1.15;
 }
 .page-sheet hr {
   border: none;
-  border-top: 1px solid #1a202c;
-  margin: 0.2rem 0 0.5rem 0;
+  border-top: 1px solid #000;
+  margin: 1pt 0 3pt 0;
 }
 .page-sheet p {
-  margin-bottom: 0.5rem;
-  line-height: 1.45;
+  margin-bottom: 2pt;
+  line-height: 1.18;
+}
+.page-sheet p.contact-info {
+  margin-bottom: 3pt;
+  font-size: 10pt;
 }
 .page-sheet ul, .page-sheet ol {
-  margin-bottom: 0.6rem;
-  padding-left: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 2pt;
+  padding-left: 1.15rem;
 }
 .page-sheet li {
-  margin-bottom: 0.2rem;
-  line-height: 1.4;
+  margin-bottom: 0.5pt;
+  line-height: 1.18;
 }
 .page-sheet table {
   width: 100%;
@@ -432,7 +445,8 @@ header.app-header {
   justify-content: space-between;
   align-items: baseline;
   width: 100%;
-  margin-bottom: 0.25rem;
+  margin-bottom: 1pt;
+  line-height: 1.18;
 }
 
 @media (max-width: 640px) {
@@ -445,7 +459,7 @@ header.app-header {
 @media print {
   @page {
     size: A4;
-    margin: 20mm;
+    margin: 15mm 18mm 15mm 18mm;
   }
 
   .no-print,
@@ -457,6 +471,9 @@ header.app-header {
   .notice-box,
   .dash-actions,
   .conflict-banner,
+  #conflictBanner,
+  .notice-banner,
+  #pdfNoticeBanner,
   .print-hint,
   .share-note,
   button,
@@ -467,8 +484,9 @@ header.app-header {
   body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 11pt;
-    line-height: 1.5;
+    font-family: 'Carlito', Calibri, 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-size: 10.5pt !important;
+    line-height: 1.18 !important;
   }
 
   .container,
@@ -489,6 +507,71 @@ header.app-header {
     max-width: none !important;
     min-height: auto !important;
     background: transparent !important;
+    font-family: 'Carlito', Calibri, 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-size: 10.5pt !important;
+    line-height: 1.18 !important;
+  }
+
+  .page-sheet h1 {
+    font-size: 15pt !important;
+    margin-top: 0 !important;
+    margin-bottom: 1.5pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .page-sheet h2 {
+    font-size: 11pt !important;
+    border-bottom: 1px solid #000000 !important;
+    padding-bottom: 1pt !important;
+    margin-top: 5pt !important;
+    margin-bottom: 2.5pt !important;
+    line-height: 1.15 !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .page-sheet h3 {
+    font-size: 10.5pt !important;
+    margin-top: 4pt !important;
+    margin-bottom: 2pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .page-sheet hr {
+    border: none !important;
+    border-top: 1px solid #000000 !important;
+    margin: 1pt 0 3pt 0 !important;
+  }
+
+  .page-sheet p {
+    margin-bottom: 2pt !important;
+    line-height: 1.18 !important;
+  }
+
+  .page-sheet p.contact-info {
+    margin-bottom: 3pt !important;
+    font-size: 10pt !important;
+  }
+
+  .page-sheet ul, .page-sheet ol {
+    margin-top: 0 !important;
+    margin-bottom: 2pt !important;
+    padding-left: 1.15rem !important;
+  }
+
+  .page-sheet li {
+    margin-bottom: 0.5pt !important;
+    line-height: 1.18 !important;
+  }
+
+  .page-sheet .split-row,
+  .page-sheet .split-line {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    width: 100% !important;
+    margin-bottom: 1pt !important;
+    line-height: 1.18 !important;
   }
 
   .page-sheet table {
@@ -497,36 +580,12 @@ header.app-header {
     word-wrap: break-word !important;
   }
 
-  .page-sheet th,
-  .page-sheet td {
-    word-break: break-word;
-  }
-
-  .page-sheet h1,
-  .page-sheet h2,
-  .page-sheet h3 {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .page-sheet hr {
-    border: none !important;
-    border-top: 1px solid #000000 !important;
-    margin: 0.15rem 0 0.35rem 0 !important;
-  }
-
   .page-sheet table.layout-table td,
   .page-sheet table.no-border td,
   .page-sheet table[border="0"] td,
   .page-sheet table:not(:has(th)) td {
     border: none !important;
     padding: 0.1rem 0 !important;
-  }
-
-  .page-sheet .split-row,
-  .page-sheet .split-line {
-    display: flex !important;
-    justify-content: space-between !important;
   }
 
   a {

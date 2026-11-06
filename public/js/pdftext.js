@@ -5,24 +5,31 @@ function escapeHtml(str) {
 }
 
 function autoLink(html) {
-  return html.replace(/(https?:\/\/[^\s<]+|(?:linkedin\.com\/in\/|github\.com\/)[^\s<]*|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, m => {
+  return html.replace(/(https?:\/\/[^\s<]+|(?:linkedin\.com\/in\/|github\.com\/)[^\s<]*|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9.-]+\.railway\.app[^\s<]*)/g, m => {
     const url = m.includes('@') && !m.startsWith('mailto:') ? 'mailto:' + m : (!m.startsWith('http') ? 'https://' + m : m);
     return `<a href="${url}">${m}</a>`;
   });
 }
 
-function formatItems(items) {
-  let res = '', lastEnd = null;
+function formatLineItems(items) {
+  let html = '', lastEnd = null, prevEndedHyphen = false, lastLineIdx = -1;
   for (const it of items) {
-    if (lastEnd !== null && it.x > lastEnd + 2 && !res.endsWith(' ') && !it.str.startsWith(' ')) res += ' ';
-    let s = escapeHtml(it.str);
-    if (it.isBold && it.isItalic) s = `<strong><em>${s}</em></strong>`;
-    else if (it.isBold) s = `<strong>${s}</strong>`;
-    else if (it.isItalic) s = `<em>${s}</em>`;
-    res += s;
+    if (!it.str && !it.width) continue;
+    const isNew = it.lineIdx !== undefined && it.lineIdx !== lastLineIdx && lastLineIdx !== -1;
+    if (isNew && !prevEndedHyphen && !html.endsWith(' ') && !it.str.startsWith(' ')) html += ' ';
+    else if (lastEnd !== null && it.x > lastEnd + 1.5 && !html.endsWith(' ') && !it.str.startsWith(' ') && !prevEndedHyphen) html += ' ';
+    let piece = escapeHtml(it.str);
+    if (it.str.trim()) {
+      if (it.isBold && it.isItalic) piece = `<strong><em>${piece}</em></strong>`;
+      else if (it.isBold) piece = `<strong>${piece}</strong>`;
+      else if (it.isItalic) piece = `<em>${piece}</em>`;
+    }
+    html += piece;
+    prevEndedHyphen = it.str.endsWith('-');
     lastEnd = it.x + it.width;
+    if (it.lineIdx !== undefined) lastLineIdx = it.lineIdx;
   }
-  return autoLink(res);
+  return autoLink(html);
 }
 
 export async function extractTextFromPdf(arrayBuffer, onProgress) {
@@ -53,211 +60,177 @@ export async function extractTextFromPdf(arrayBuffer, onProgress) {
     throw new Error('We could not read this file.');
   }
 
-  const totalPages = pdf.numPages;
-  const pagesToExtract = Math.min(totalPages, 50);
-  const rawPages = [];
+  const totalPages = pdf.numPages, pagesToExtract = Math.min(totalPages, 50);
+  const blocks = [];
+  let extractedTitle = '';
 
   for (let p = 1; p <= pagesToExtract; p++) {
     if (typeof onProgress === 'function') onProgress(p, pagesToExtract, totalPages);
     const page = await pdf.getPage(p);
     const viewport = page.getViewport({ scale: 1.0 });
+    try { await page.getOperatorList(); } catch (_) {}
     const textContent = await page.getTextContent();
-    const styles = textContent.styles || {};
 
-    const items = [];
-    for (const item of textContent.items) {
-      if (!item.str || !item.str.trim()) continue;
-      const x = item.transform[4];
-      const y = viewport.height - item.transform[5];
-      const fontSize = Math.round(item.height || Math.abs(item.transform[0]) || Math.abs(item.transform[3]) || 12);
-      const fontStyle = styles[item.fontName];
-      const fontName = ((item.fontName || '') + ' ' + (fontStyle?.fontFamily || '')).toLowerCase();
-      const isBold = /bold|black|heavy|semibold|medium/i.test(fontName);
-      const isItalic = /italic|oblique/i.test(fontName);
-      items.push({ str: item.str, x, y, width: item.width || 0, fontSize, isBold, isItalic });
-    }
-
-    items.sort((a, b) => a.y - b.y || a.x - b.x);
-    const lines = [];
-    for (const item of items) {
-      const line = lines.find(l => Math.abs(l.y - item.y) <= Math.max(3, item.fontSize * 0.35));
-      if (line) line.items.push(item);
-      else lines.push({ y: item.y, items: [item], page: p, height: viewport.height });
-    }
-
-    lines.sort((a, b) => a.y - b.y);
-    const pageLines = [];
-    for (const line of lines) {
-      line.items.sort((a, b) => a.x - b.x);
-      let lineText = '', lastXEnd = null, maxFontSize = 0, splitIndex = -1;
-
-      for (let idx = 0; idx < line.items.length; idx++) {
-        const it = line.items[idx];
-        maxFontSize = Math.max(maxFontSize, it.fontSize);
-        if (lastXEnd !== null) {
-          const gap = it.x - lastXEnd;
-          if (gap > 35 && it.x > viewport.width * 0.45 && splitIndex === -1) splitIndex = idx;
-          if (gap > 2 && !lineText.endsWith(' ') && !it.str.startsWith(' ')) lineText += ' ';
-        }
-        lineText += it.str;
-        lastXEnd = it.x + it.width;
+    function getRealFont(fontName) {
+      if (page.commonObjs && page.commonObjs.has(fontName)) {
+        const obj = page.commonObjs.get(fontName);
+        return obj.name || obj.loadedName || (obj.data && obj.data.name) || '';
       }
+      return textContent.styles?.[fontName]?.fontFamily || '';
+    }
 
-      const trimmed = lineText.trim();
-      if (!trimmed) continue;
-
-      const minX = line.items[0].x;
-      const maxX = line.items[line.items.length - 1].x + line.items[line.items.length - 1].width;
-      const isCentered = (maxX - minX) < viewport.width * 0.85 && Math.abs((minX + maxX) / 2 - viewport.width / 2) < (viewport.width * 0.08);
-
-      pageLines.push({
-        text: trimmed,
-        html: formatItems(line.items),
-        fontSize: maxFontSize,
-        y: line.y,
-        page: p,
-        height: line.height,
-        isCentered,
-        isSplit: splitIndex > 0,
-        leftHtml: splitIndex > 0 ? formatItems(line.items.slice(0, splitIndex)) : '',
-        rightHtml: splitIndex > 0 ? formatItems(line.items.slice(splitIndex)) : ''
+    const rawItems = [];
+    for (const it of textContent.items) {
+      if (!it.str && !it.width) continue;
+      const x = it.transform[4], y = viewport.height - it.transform[5], font = getRealFont(it.fontName);
+      rawItems.push({
+        str: it.str, x, y, width: it.width, height: it.height || 11,
+        fontSize: Math.round(Math.abs(it.transform[0]) || it.height || 11),
+        isBold: /bold|black|heavy|semibold/i.test(font),
+        isItalic: /italic|oblique/i.test(font)
       });
     }
-    rawPages.push(pageLines);
-  }
 
-  // Remove repeating headers and footers across pages if >= 3 pages
-  if (pagesToExtract >= 3) {
-    const candidateCounts = new Map();
-    for (const pageLines of rawPages) {
-      const topBottom = pageLines.filter(l => l.y < l.height * 0.1 || l.y > l.height * 0.9);
-      const seen = new Set();
-      for (const l of topBottom) {
-        const norm = l.text.toLowerCase().replace(/\d+/g, '#').trim();
-        if (!seen.has(norm)) { seen.add(norm); candidateCounts.set(norm, (candidateCounts.get(norm) || 0) + 1); }
+    rawItems.sort((a, b) => a.y - b.y || a.x - b.x);
+    if (!rawItems.length) continue;
+
+    const lines = [];
+    for (const it of rawItems) {
+      const line = lines.find(l => Math.abs(l.y - it.y) <= 3);
+      if (line) line.items.push(it);
+      else lines.push({ y: it.y, items: [it] });
+    }
+    lines.sort((a, b) => a.y - b.y);
+    lines.forEach((l, idx) => l.items.forEach(it => { it.lineIdx = idx; }));
+
+    const fontFreq = new Map();
+    for (const it of rawItems) if (it.str.trim()) fontFreq.set(it.fontSize, (fontFreq.get(it.fontSize) || 0) + 1);
+    let dominantFontSize = 11, maxCount = 0;
+    for (const [s, c] of fontFreq) if (c > maxCount) { maxCount = c; dominantFontSize = s; }
+
+    const gapFreq = new Map();
+    for (let i = 0; i < lines.length - 1; i++) {
+      const gap = Math.round((lines[i + 1].y - lines[i].y) * 10) / 10;
+      if (gap > 8 && gap < 25) gapFreq.set(gap, (gapFreq.get(gap) || 0) + 1);
+    }
+    let dominantLineGap = 13.4, maxGapCount = 0;
+    for (const [g, c] of gapFreq) if (c > maxGapCount) { maxGapCount = c; dominantLineGap = g; }
+
+    const parsedLines = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      line.items.sort((a, b) => a.x - b.x);
+
+      let splitIndex = -1, lastEnd = null;
+      for (let idx = 0; idx < line.items.length; idx++) {
+        const it = line.items[idx];
+        if (lastEnd !== null && it.x - lastEnd > 12 && it.x > viewport.width * 0.6 && splitIndex === -1) splitIndex = idx;
+        if (it.str.trim() === '' && it.width > 12 && it.x > viewport.width * 0.5 && splitIndex === -1 && idx + 1 < line.items.length) splitIndex = idx + 1;
+        lastEnd = it.x + it.width;
+      }
+
+      const nonSpace = line.items.filter(it => it.str.trim() !== '');
+      const minX = nonSpace[0]?.x ?? line.items[0].x;
+      const lastItem = nonSpace[nonSpace.length - 1] ?? line.items[line.items.length - 1];
+      const maxX = lastItem.x + lastItem.width;
+      const isCentered = Math.abs((minX + maxX) / 2 - viewport.width / 2) < (viewport.width * 0.05);
+
+      const rawText = line.items.map(it => it.str).join('').trim();
+      const bulletMatch = rawText.match(/^([•\u2022\u25cf\u25e6\u2219\*\-\–\—▪▫]|\([a-zA-Z0-9]\))\s*(.*)$/);
+      const isBullet = Boolean(bulletMatch);
+      const isUppercase = /^[A-Z0-9\s&/,:|\-]{3,35}$/.test(rawText) && /[A-Z]/.test(rawText) && !/[a-z]/.test(rawText);
+      const maxLineFontSize = Math.max(...line.items.map(it => it.fontSize));
+      const isHeading = !isBullet && (maxLineFontSize >= dominantFontSize * 1.05 || isUppercase) && rawText.length < 40 && !rawText.endsWith('.');
+
+      parsedLines.push({
+        y: line.y, minX, maxX, isCentered, isSplit: splitIndex > 0,
+        leftItems: splitIndex > 0 ? line.items.slice(0, splitIndex).filter(it => it.str.trim() !== '') : [],
+        rightItems: splitIndex > 0 ? line.items.slice(splitIndex).filter(it => it.str.trim() !== '') : [],
+        items: line.items, rawText, isBullet, isHeading
+      });
+    }
+
+    let i = 0;
+    if (p === 1 && parsedLines[0]?.isCentered) {
+      const headerLines = [];
+      while (i < parsedLines.length && parsedLines[i].y < 120 && parsedLines[i].isCentered) {
+        if (parsedLines[i].rawText === 'SUMMARY' || parsedLines[i].rawText === 'EXPERIENCE') break;
+        headerLines.push(parsedLines[i]);
+        i++;
+      }
+      blocks.push({ type: 'h1', html: formatLineItems(headerLines[0].items), isCentered: true });
+      if (!extractedTitle) extractedTitle = headerLines[0].rawText;
+
+      if (headerLines.length > 1) {
+        const contactItems = [];
+        for (let k = 1; k < headerLines.length; k++) contactItems.push(...headerLines[k].items);
+        blocks.push({ type: 'contact', html: formatLineItems(contactItems), isCentered: true });
       }
     }
-    const threshold = Math.ceil(pagesToExtract * 0.5);
-    for (const pageLines of rawPages) {
-      for (let i = pageLines.length - 1; i >= 0; i--) {
-        const l = pageLines[i];
-        if (l.y < l.height * 0.1 || l.y > l.height * 0.9) {
-          const norm = l.text.toLowerCase().replace(/\d+/g, '#').trim();
-          if ((candidateCounts.get(norm) || 0) >= threshold) pageLines.splice(i, 1);
+
+    while (i < parsedLines.length) {
+      const cur = parsedLines[i];
+      if (cur.isHeading) {
+        blocks.push({ type: 'heading', html: formatLineItems(cur.items) });
+        if (!extractedTitle) extractedTitle = cur.rawText;
+        i++;
+        continue;
+      }
+      if (cur.isSplit) {
+        blocks.push({ type: 'split-row', leftHtml: formatLineItems(cur.leftItems), rightHtml: formatLineItems(cur.rightItems) });
+        i++;
+        continue;
+      }
+      if (cur.isBullet) {
+        const bulletItems = [...cur.items];
+        let j = i + 1;
+        while (j < parsedLines.length) {
+          const next = parsedLines[j], gap = next.y - parsedLines[j - 1].y;
+          if (!next.isBullet && !next.isHeading && !next.isSplit && next.minX > 68 && gap <= dominantLineGap * 1.25) {
+            bulletItems.push(...next.items);
+            j++;
+          } else break;
         }
+        let bulletHtml = formatLineItems(bulletItems).replace(/^([•\u2022\u25cf\u25e6\u2219\*\-\–\—▪▫]|\([a-zA-Z0-9]\))\s*/, '').trim();
+        blocks.push({ type: 'bullet', html: bulletHtml });
+        i = j;
+        continue;
       }
-    }
-  }
-
-  const allLines = rawPages.flat();
-  const fullText = allLines.map(l => l.text).join(' ');
-  if (fullText.replace(/\s+/g, '').length < 50) return { html: '', title: '', isScanned: true, pageCount: totalPages };
-
-  const fontFreq = new Map();
-  for (const l of allLines) {
-    if (l.text.length > 3) fontFreq.set(l.fontSize, (fontFreq.get(l.fontSize) || 0) + 1);
-  }
-  let bodyFontSize = 12, maxCount = 0;
-  for (const [size, count] of fontFreq) {
-    if (count > maxCount) { maxCount = count; bodyFontSize = size; }
-  }
-
-  const largerSizes = [...new Set(allLines.map(l => l.fontSize))]
-    .filter(s => s >= bodyFontSize * 1.15)
-    .sort((a, b) => b - a);
-
-  const h1Threshold = largerSizes[0] || 999;
-  const h2Threshold = largerSizes[1] || largerSizes[0] || 999;
-
-  for (let i = 0; i < allLines.length - 1; i++) {
-    if (allLines[i].text.endsWith('-') && allLines[i + 1].text.match(/^[a-z]/)) {
-      allLines[i].text = allLines[i].text.slice(0, -1);
-      allLines[i].hyphenJoined = true;
+      const paraItems = [...cur.items];
+      let j = i + 1;
+      while (j < parsedLines.length) {
+        const next = parsedLines[j], prev = parsedLines[j - 1], gap = next.y - prev.y;
+        const sameLeft = Math.abs(next.minX - cur.minX) < 8;
+        const prevWrapped = prev.maxX > viewport.width * 0.7 || prev.rawText.endsWith('-');
+        const isCat = /^[A-Z][a-zA-Z0-9\s&/]+:/.test(next.rawText.trim());
+        if (!next.isBullet && !next.isHeading && !next.isSplit && sameLeft && gap <= dominantLineGap * 1.35 && prevWrapped && !isCat) {
+          paraItems.push(...next.items);
+          j++;
+        } else break;
+      }
+      blocks.push({ type: 'p', html: formatLineItems(paraItems) });
+      i = j;
     }
   }
 
   const parts = [];
-  let currentList = null, currentPara = [], extractedTitle = '';
-
-  const flushPara = () => {
-    if (currentPara.length > 0) { parts.push(`<p>${currentPara.join(' ')}</p>`); currentPara = []; }
-  };
-  const flushList = () => {
-    if (currentList) { parts.push(`</${currentList}>`); currentList = null; }
-  };
-
-  for (let i = 0; i < allLines.length; i++) {
-    const l = allLines[i];
-    const bulletMatch = l.text.match(/^([•\u2022\u25cf\u25e6\u2219\*\-\–\—▪▫]|\([a-zA-Z0-9]\))\s+(.+)$/);
-    const numMatch = l.text.match(/^(\d+[\.\)])\s+(.+)$/);
-
-    if (bulletMatch || numMatch) {
-      flushPara();
-      const listType = bulletMatch ? 'ul' : 'ol';
-      const itemHtml = l.html.replace(/^([•\u2022\u25cf\u25e6\u2219\*\-\–\—▪▫]|\([a-zA-Z0-9]\)|\d+[\.\)])\s*/, '').trim();
-      if (currentList !== listType) { flushList(); parts.push(`<${listType}>`); currentList = listType; }
-      parts.push(`<li>${itemHtml}</li>`);
+  let inList = false;
+  for (const b of blocks) {
+    if (b.type === 'bullet') {
+      if (!inList) { parts.push('<ul>'); inList = true; }
+      parts.push(`  <li>${b.html}</li>`);
       continue;
     }
-
-    if (l.isSplit) {
-      flushPara();
-      flushList();
-      parts.push(`<table class="layout-table" style="width: 100%;"><tr><td>${l.leftHtml}</td><td style="text-align: right;">${l.rightHtml}</td></tr></table>`);
-      continue;
-    }
-
-    if (l.fontSize >= h1Threshold && l.text.length < 150 && !l.text.endsWith('.')) {
-      flushPara();
-      flushList();
-      parts.push(`<h1${l.isCentered ? ' style="text-align: center;"' : ''}>${l.html}</h1>`);
-      if (!extractedTitle) extractedTitle = l.text;
-      continue;
-    }
-
-    const isUppercase = /^[A-Z0-9\s&/,:|\-]{3,40}$/.test(l.text.trim()) && /[A-Z]/.test(l.text) && !/[a-z]/.test(l.text);
-    const isSectionHeading = (l.fontSize >= h2Threshold || isUppercase) && l.text.length < 60 && !l.text.endsWith('.');
-
-    if (isSectionHeading) {
-      flushPara();
-      flushList();
-      parts.push(`<h2${l.isCentered ? ' style="text-align: center;"' : ''}>${l.html}</h2>\n<hr>`);
-      if (!extractedTitle) extractedTitle = l.text;
-      continue;
-    }
-
-    if (l.isCentered) {
-      flushPara();
-      flushList();
-      parts.push(`<p style="text-align: center;">${l.html}</p>`);
-      if (!extractedTitle) extractedTitle = l.text;
-      continue;
-    }
-
-    flushList();
-    if (!extractedTitle && l.text.length < 100) extractedTitle = l.text;
-
-    const prev = allLines[i - 1];
-    const shouldBreak = prev && !prev.hyphenJoined &&
-      (prev.text.endsWith('.') || prev.text.endsWith('!') || prev.text.endsWith('?')) &&
-      (l.page !== prev.page || l.y - prev.y > l.fontSize * 1.8);
-
-    if (shouldBreak) flushPara();
-
-    if (prev && prev.hyphenJoined && currentPara.length > 0) {
-      currentPara[currentPara.length - 1] += l.html;
-    } else {
-      currentPara.push(l.html);
-    }
+    if (inList) { parts.push('</ul>'); inList = false; }
+    if (b.type === 'h1') parts.push(`<h1${b.isCentered ? ' style="text-align: center;"' : ''}>${b.html}</h1>`);
+    else if (b.type === 'contact') parts.push(`<p class="contact-info"${b.isCentered ? ' style="text-align: center;"' : ''}>${b.html}</p>`);
+    else if (b.type === 'heading') parts.push(`<h2>${b.html}</h2>`);
+    else if (b.type === 'split-row') parts.push(`<div class="split-row"><span>${b.leftHtml}</span><span>${b.rightHtml}</span></div>`);
+    else if (b.type === 'p') parts.push(`<p>${b.html}</p>`);
   }
+  if (inList) parts.push('</ul>');
 
-  flushPara();
-  flushList();
-
-  return {
-    html: parts.join('\n'),
-    title: extractedTitle.slice(0, 100),
-    isScanned: false,
-    pageCount: totalPages
-  };
+  const fullHtml = parts.join('\n');
+  const isScanned = fullHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, '').length < 50;
+  return { html: isScanned ? '' : fullHtml, title: (extractedTitle || 'Untitled').slice(0, 100), isScanned, pageCount: totalPages };
 }
