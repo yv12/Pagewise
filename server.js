@@ -101,8 +101,20 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Pagewise running on port ${PORT}`);
 });
 
-process.on('SIGTERM', () => {
+function shutdown(signal) {
+  console.log(`Received ${signal}, shutting down gracefully...`);
   server.close(() => {
+    console.log('HTTP server closed');
     process.exit(0);
   });
-});
+  if (typeof server.closeAllConnections === 'function') {
+    server.closeAllConnections();
+  }
+  setTimeout(() => {
+    console.warn('Forcing shutdown after timeout');
+    process.exit(0);
+  }, 1500).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
