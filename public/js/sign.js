@@ -2,10 +2,36 @@
 const [,, key,, docId] = window.location.pathname.split('/');
 if (!key || !docId) window.location.href = '/';
 document.getElementById('backLink').href = `/w/${key}`;
-let originalBytes = null, currentDoc = null, activePage = 1, items = [], hasUnsaved = false;
+let originalBytes = null, currentDoc = null, activePage = 1, items = [], hasUnsaved = false, totalPages = 1;
+let pageObserver = null;
 window.addEventListener('beforeunload', e => { if (hasUnsaved) { e.preventDefault(); e.returnValue = ''; } });
 const pdfViewer = document.getElementById('pdfViewer');
 const [signStatus, savedBadge, dlSavedBtn, downloadBtn] = ['signStatus', 'savedBadge', 'dlSavedBtn', 'downloadBtn'].map(id => document.getElementById(id));
+const pageSelect = document.getElementById('pageSelect');
+const pageSelectWrap = document.getElementById('pageSelectWrap');
+
+function setActivePage(p, scrollIntoView = false) {
+  if (!p || p < 1 || p > totalPages) return;
+  activePage = p;
+  if (pageSelect && pageSelect.value !== String(p)) {
+    pageSelect.value = String(p);
+  }
+  document.querySelectorAll('.pdf-page-wrapper').forEach(w => {
+    w.classList.toggle('active-page', parseInt(w.dataset.page, 10) === p);
+  });
+  if (scrollIntoView) {
+    const wrap = document.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
+    wrap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function getLocalDateString() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 async function init() {
   try {
@@ -31,12 +57,55 @@ async function renderPdf(data) {
   if (!window.pdfjsLib) throw new Error('Could not load the PDF tools. Refresh the page.');
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
+  totalPages = pdf.numPages;
   pdfViewer.innerHTML = '';
+
+  if (pageSelect) {
+    pageSelect.innerHTML = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = `${p} of ${pdf.numPages}`;
+      pageSelect.appendChild(opt);
+    }
+    if (pageSelectWrap) pageSelectWrap.style.display = pdf.numPages > 1 ? 'inline-flex' : 'none';
+    pageSelect.onchange = () => {
+      setActivePage(parseInt(pageSelect.value, 10), true);
+    };
+  }
+
+  if (pageObserver) pageObserver.disconnect();
+  if ('IntersectionObserver' in window) {
+    pageObserver = new IntersectionObserver((entries) => {
+      let best = null;
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          if (!best || entry.intersectionRatio > best.intersectionRatio) {
+            best = entry;
+          }
+        }
+      }
+      if (best) {
+        const p = parseInt(best.target.dataset.page, 10);
+        setActivePage(p, false);
+      }
+    }, { threshold: [0.1, 0.25, 0.5, 0.75, 1.0] });
+  }
+
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const vp = page.getViewport({ scale: 1.5 });
     const wrap = document.createElement('div');
-    wrap.className = 'pdf-page-wrapper'; wrap.dataset.page = p;
+    wrap.className = 'pdf-page-wrapper' + (p === activePage ? ' active-page' : '');
+    wrap.dataset.page = p;
+
+    if (pdf.numPages > 1) {
+      const tag = document.createElement('span');
+      tag.className = 'page-number-tag';
+      tag.textContent = `Page ${p} of ${pdf.numPages}`;
+      wrap.appendChild(tag);
+    }
+
     const canvas = document.createElement('canvas');
     canvas.className = 'pdf-page-canvas'; canvas.width = vp.width; canvas.height = vp.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
@@ -44,7 +113,9 @@ async function renderPdf(data) {
     ov.className = 'page-overlay'; ov.dataset.page = p;
     wrap.append(canvas, ov);
     pdfViewer.appendChild(wrap);
-    wrap.addEventListener('pointerenter', () => { activePage = p; });
+
+    wrap.addEventListener('pointerdown', () => { setActivePage(p, false); });
+    if (pageObserver) pageObserver.observe(wrap);
   }
 }
 
@@ -52,6 +123,10 @@ function addItem(type, content, w = 0.25, h = 0.08) {
   const p = activePage || 1;
   const overlay = document.querySelector(`.page-overlay[data-page="${p}"]`);
   if (!overlay) return;
+
+  const currentWrap = overlay.closest('.pdf-page-wrapper');
+  currentWrap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
   const item = { id: 'it_' + Date.now() + Math.random().toString(36).slice(2, 5), pageNum: p, type, content, x: 0.35, y: 0.45, width: w, height: h };
   items.push(item);
   hasUnsaved = true;
@@ -68,16 +143,27 @@ function addItem(type, content, w = 0.25, h = 0.08) {
   const resizer = document.createElement('div');
   resizer.className = 'resize-handle';
   resizer.onpointerdown = e => {
-    e.stopPropagation(); e.preventDefault(); resizer.setPointerCapture(e.pointerId);
-    const sx = e.clientX, sy = e.clientY, sw = item.width, sh = item.height, rect = overlay.getBoundingClientRect();
-    resizer.onpointermove = ev => {
+    e.stopPropagation(); e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, sw = item.width, sh = item.height;
+    const onResizeMove = ev => {
+      const currentOverlay = el.parentElement;
+      if (!currentOverlay) return;
+      const rect = currentOverlay.getBoundingClientRect();
       item.width = Math.max(0.06, Math.min(1 - item.x, sw + (ev.clientX - sx) / rect.width));
       item.height = Math.max(0.02, Math.min(1 - item.y, sh + (ev.clientY - sy) / rect.height));
       sync(); hasUnsaved = true;
     };
-    resizer.onpointerup = ev => { resizer.onpointermove = null; resizer.onpointerup = null; resizer.releasePointerCapture(ev.pointerId); };
+    const onResizeUp = () => {
+      window.removeEventListener('pointermove', onResizeMove);
+      window.removeEventListener('pointerup', onResizeUp);
+      window.removeEventListener('pointercancel', onResizeUp);
+    };
+    window.addEventListener('pointermove', onResizeMove);
+    window.addEventListener('pointerup', onResizeUp);
+    window.addEventListener('pointercancel', onResizeUp);
   };
   el.append(del, resizer);
+
   if (type === 'signature') {
     const img = document.createElement('img');
     img.src = content; img.style.cssText = 'width:100%;height:100%;object-fit:contain;pointer-events:none;';
@@ -91,14 +177,107 @@ function addItem(type, content, w = 0.25, h = 0.08) {
 
   el.onpointerdown = e => {
     if (e.target.closest('.item-delete-btn,.resize-handle,textarea')) return;
-    e.preventDefault(); el.setPointerCapture(e.pointerId);
-    const sx = e.clientX, sy = e.clientY, ox = item.x, oy = item.y, rect = overlay.getBoundingClientRect();
-    el.onpointermove = ev => {
-      item.x = Math.max(0, Math.min(1 - item.width, ox + (ev.clientX - sx) / rect.width));
-      item.y = Math.max(0, Math.min(1 - item.height, oy + (ev.clientY - sy) / rect.height));
-      sync(); hasUnsaved = true;
+    e.preventDefault();
+    el.classList.add('dragging');
+    setActivePage(item.pageNum, false);
+
+    const elRect = el.getBoundingClientRect();
+    const grabX = e.clientX - elRect.left;
+    const grabY = e.clientY - elRect.top;
+    const widthPx = elRect.width;
+    const heightPx = elRect.height;
+
+    let autoScrollRaf = null;
+    let lastClientX = e.clientX;
+    let lastClientY = e.clientY;
+
+    const updatePosition = (clientX, clientY) => {
+      const targetTop = clientY - grabY;
+      const targetLeft = clientX - grabX;
+      const centerY = targetTop + heightPx / 2;
+
+      const wrappers = Array.from(document.querySelectorAll('.pdf-page-wrapper'));
+      if (!wrappers.length) return;
+
+      let targetWrap = wrappers[0];
+      let minDistance = Infinity;
+
+      for (const wrap of wrappers) {
+        const r = wrap.getBoundingClientRect();
+        if (centerY >= r.top && centerY <= r.bottom) {
+          targetWrap = wrap;
+          minDistance = 0;
+          break;
+        }
+        const dist = centerY < r.top ? r.top - centerY : centerY - r.bottom;
+        if (dist < minDistance) {
+          minDistance = dist;
+          targetWrap = wrap;
+        }
+      }
+
+      const targetPage = parseInt(targetWrap.dataset.page, 10);
+      const targetOverlay = targetWrap.querySelector('.page-overlay');
+      const targetRect = targetOverlay.getBoundingClientRect();
+
+      if (item.pageNum !== targetPage) {
+        item.pageNum = targetPage;
+        targetOverlay.appendChild(el);
+        setActivePage(targetPage, false);
+      }
+
+      item.x = Math.max(0, Math.min(1 - item.width, (targetLeft - targetRect.left) / targetRect.width));
+      item.y = Math.max(0, Math.min(1 - item.height, (targetTop - targetRect.top) / targetRect.height));
+      sync();
+      hasUnsaved = true;
     };
-    el.onpointerup = ev => { el.onpointermove = null; el.onpointerup = null; el.releasePointerCapture(ev.pointerId); };
+
+    const doAutoScroll = () => {
+      const scrollMargin = 60;
+      let scrolled = false;
+      if (lastClientY < scrollMargin) {
+        window.scrollBy(0, -Math.min(15, (scrollMargin - lastClientY) * 0.4));
+        scrolled = true;
+      } else if (lastClientY > window.innerHeight - scrollMargin) {
+        window.scrollBy(0, Math.min(15, (lastClientY - (window.innerHeight - scrollMargin)) * 0.4));
+        scrolled = true;
+      }
+      if (scrolled) {
+        updatePosition(lastClientX, lastClientY);
+        autoScrollRaf = requestAnimationFrame(doAutoScroll);
+      } else {
+        autoScrollRaf = null;
+      }
+    };
+
+    const onMove = ev => {
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
+      updatePosition(lastClientX, lastClientY);
+
+      const scrollMargin = 60;
+      if (ev.clientY < scrollMargin || ev.clientY > window.innerHeight - scrollMargin) {
+        if (!autoScrollRaf) autoScrollRaf = requestAnimationFrame(doAutoScroll);
+      } else if (autoScrollRaf) {
+        cancelAnimationFrame(autoScrollRaf);
+        autoScrollRaf = null;
+      }
+    };
+
+    const onUp = () => {
+      el.classList.remove('dragging');
+      if (autoScrollRaf) {
+        cancelAnimationFrame(autoScrollRaf);
+        autoScrollRaf = null;
+      }
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
   overlay.appendChild(el);
 }
@@ -180,7 +359,7 @@ useSigBtn.onclick = async () => {
 };
 
 document.getElementById('addSigBtn').onclick = openModal;
-document.getElementById('addDateBtn').onclick = () => addItem('date', new Date().toISOString().slice(0, 10), 0.18, 0.04);
+document.getElementById('addDateBtn').onclick = () => addItem('date', getLocalDateString(), 0.18, 0.04);
 document.getElementById('addTextBtn').onclick = () => addItem('text', 'Enter text', 0.22, 0.05);
 
 downloadBtn.onclick = async () => {

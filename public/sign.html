@@ -28,6 +28,15 @@
     .pdf-page-wrapper {
       position: relative; background: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
       border: 1px solid var(--border); border-radius: 2px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .pdf-page-wrapper.active-page {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(37,99,235,0.25), 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .page-number-tag {
+      position: absolute; top: -22px; left: 0; font-size: 0.75rem; color: var(--muted);
+      font-weight: 500; user-select: none;
     }
     .pdf-page-canvas { display: block; max-width: 100%; height: auto; }
     .page-overlay {
@@ -40,6 +49,11 @@
     }
     .placed-item:hover, .placed-item.selected {
       border: 1px solid var(--primary); background: rgba(37,99,235,0.08);
+    }
+    .placed-item.dragging {
+      opacity: 0.9;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      z-index: 50;
     }
     .item-delete-btn {
       position: absolute; top: -10px; right: -10px; width: 22px; height: 22px;
@@ -108,10 +122,14 @@
       </div>
     </div>
     <div class="sign-topbar-row">
-      <div style="display: flex; gap: 0.5rem;">
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
         <button id="addSigBtn" class="secondary" style="font-size: 0.8rem;">+ Add signature</button>
         <button id="addDateBtn" class="secondary" style="font-size: 0.8rem;">+ Add date</button>
         <button id="addTextBtn" class="secondary" style="font-size: 0.8rem;">+ Add text</button>
+        <div id="pageSelectWrap" style="display: none; align-items: center; gap: 0.35rem; margin-left: 0.5rem; font-size: 0.8rem; color: var(--muted);">
+          <label for="pageSelect">Page:</label>
+          <select id="pageSelect" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;"></select>
+        </div>
       </div>
       <div id="signStatus" style="font-size: 0.8rem; color: var(--muted);"></div>
     </div>
