@@ -4,10 +4,15 @@ import { mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DATA_DIR = process.env.DATA_DIR || './data';
-mkdirSync(join(DATA_DIR, 'files'), { recursive: true });
+try {
+  mkdirSync(join(DATA_DIR, 'files'), { recursive: true });
+} catch (e) {
+  console.warn('Notice: Could not create files directory:', e.message);
+}
 
 const db = new Database(join(DATA_DIR, 'pagewise.db'));
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS workspaces (
@@ -149,6 +154,15 @@ export function deleteFile(fileId, ws) {
   db.prepare('DELETE FROM files WHERE id = ?').run(fileId, ws);
   return true;
 }
+
+export function closeDb() {
+  try {
+    db.close();
+  } catch {
+    /* ok */
+  }
+}
+
 
 
 

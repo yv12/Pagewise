@@ -11,6 +11,12 @@ const __dirname = dirname(__filename);
 
 const app = express();
 app.set('trust proxy', true);
+
+// Health check endpoint for deployment orchestrators (Railway / Render / Docker)
+app.get(['/healthz', '/health'], (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(express.json({ limit: '1mb' }));
 
 // Serve static frontend files
@@ -32,10 +38,6 @@ function checkRateLimit(ip) {
 
 // --- REST API ---
 app.use('/api', apiRouter);
-
-app.get(['/healthz', '/health'], (_req, res) => {
-  res.json({ status: 'ok' });
-});
 
 app.post('/api/workspaces', (req, res) => {
   if (!checkRateLimit(req.ip)) {
@@ -93,7 +95,7 @@ app.get('/p/:id', (_req, res) => {
   res.sendFile(join(__dirname, 'public', 'view.html'));
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 const server = app.listen(PORT, '0.0.0.0', () => {
   if (process.env.NODE_ENV === 'production' && !process.env.DATA_DIR) {
     console.warn('Warning: DATA_DIR is not set in production. Data may be lost on redeploy.');
@@ -105,6 +107,7 @@ function shutdown(signal) {
   console.log(`Received ${signal}, shutting down gracefully...`);
   server.close(() => {
     console.log('HTTP server closed');
+    db.closeDb();
     process.exit(0);
   });
   if (typeof server.closeAllConnections === 'function') {
@@ -112,6 +115,7 @@ function shutdown(signal) {
   }
   setTimeout(() => {
     console.warn('Forcing shutdown after timeout');
+    db.closeDb();
     process.exit(0);
   }, 1500).unref();
 }
