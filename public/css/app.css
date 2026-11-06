@@ -1,3 +1,5 @@
+@import url('../fonts/fonts.css');
+
 /* Pagewise Shared Styles */
 :root {
   --bg: #f8f9fa;
@@ -484,9 +486,9 @@ header.app-header {
   body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'Carlito', Calibri, 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    font-size: 10.5pt !important;
-    line-height: 1.18 !important;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
   }
 
   .container,
@@ -507,22 +509,18 @@ header.app-header {
     max-width: none !important;
     min-height: auto !important;
     background: transparent !important;
-    font-family: 'Carlito', Calibri, 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    font-size: 10.5pt !important;
-    line-height: 1.18 !important;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
   }
 
   .page-sheet h1 {
-    font-size: 15pt !important;
     margin-top: 0 !important;
-    margin-bottom: 1.5pt !important;
+    margin-bottom: 2pt !important;
     line-height: 1.15 !important;
   }
 
   .page-sheet h2 {
-    font-size: 11pt !important;
-    border-bottom: 1px solid #000000 !important;
-    padding-bottom: 1pt !important;
     margin-top: 5pt !important;
     margin-bottom: 2.5pt !important;
     line-height: 1.15 !important;
@@ -531,7 +529,6 @@ header.app-header {
   }
 
   .page-sheet h3 {
-    font-size: 10.5pt !important;
     margin-top: 4pt !important;
     margin-bottom: 2pt !important;
     line-height: 1.15 !important;
@@ -545,12 +542,11 @@ header.app-header {
 
   .page-sheet p {
     margin-bottom: 2pt !important;
-    line-height: 1.18 !important;
+    line-height: inherit !important;
   }
 
   .page-sheet p.contact-info {
     margin-bottom: 3pt !important;
-    font-size: 10pt !important;
   }
 
   .page-sheet ul, .page-sheet ol {
@@ -561,7 +557,7 @@ header.app-header {
 
   .page-sheet li {
     margin-bottom: 0.5pt !important;
-    line-height: 1.18 !important;
+    line-height: inherit !important;
   }
 
   .page-sheet .split-row,
@@ -571,7 +567,7 @@ header.app-header {
     align-items: baseline !important;
     width: 100% !important;
     margin-bottom: 1pt !important;
-    line-height: 1.18 !important;
+    line-height: inherit !important;
   }
 
   .page-sheet table {

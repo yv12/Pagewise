@@ -54,35 +54,8 @@ async function loadDoc() {
 
     if (data.kind === 'pdf') {
       editor.classList.add('pdf-imported');
-      editor.style.width = '595.3pt';
-      editor.style.maxWidth = '595.3pt';
-      editor.style.padding = '54pt';
-      editor.style.fontSize = '10.5pt';
-      editor.style.lineHeight = '1.2';
-      editor.style.fontFamily = "'Carlito', 'Lato', Calibri, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-
-      // After rendering, compare the width of the longest body line with the original. If wider by > 3%, scale font size down.
-      requestAnimationFrame(() => {
-        const expectedMaxWidth = 595.3 - 54.1 * 2; // ~487.1 pt
-        let maxLineWidth = 0;
-        const paragraphs = editor.querySelectorAll('p:not(.contact-info), li');
-        paragraphs.forEach(p => {
-          if (p.scrollWidth > maxLineWidth) maxLineWidth = p.scrollWidth;
-        });
-        if (maxLineWidth > expectedMaxWidth * 1.03) {
-          const scale = expectedMaxWidth / maxLineWidth;
-          const newSize = Math.max(9, 10.5 * scale);
-          editor.style.fontSize = newSize.toFixed(1) + 'pt';
-        }
-      });
     } else {
       editor.classList.remove('pdf-imported');
-      editor.style.width = '';
-      editor.style.maxWidth = '';
-      editor.style.padding = '';
-      editor.style.fontSize = '';
-      editor.style.lineHeight = '';
-      editor.style.fontFamily = '';
     }
 
     if (pdfNoticeBanner) {
