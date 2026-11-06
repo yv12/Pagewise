@@ -2,5 +2,6 @@ node_modules/
 data/
 test-data/
 test-samples/
+scripts/vendor/
 .env
 *.log

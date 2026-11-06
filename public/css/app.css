@@ -459,7 +459,7 @@ header.app-header {
 @media print {
   @page {
     size: A4;
-    margin: 15mm 18mm 15mm 18mm;
+    margin: 54pt;
   }
 
   .no-print,
